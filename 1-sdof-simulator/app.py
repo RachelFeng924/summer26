@@ -75,7 +75,7 @@ WALL_X = -1.1
 SCALE = 0.8 / max(x_amp, 1e-6)
 SPRING_Y = 0.35
 DAMPER_Y = -0.35
-DAMPER_CYL_LEN = 0.5
+DAMPER_CYL_FRAC = 0.4  # cylinder occupies this fraction of the wall-to-mass gap
 
 
 def spring_xy(x_now):
@@ -89,12 +89,20 @@ def spring_xy(x_now):
     return zig_x, zig_y, x_mass
 
 
-def damper_rod_xy(x_now):
-    """Piston rod running from the fixed cylinder to the mass, offset below the centerline."""
+def damper_xy(x_now):
+    """Cylinder + piston rod that both scale with the wall-to-mass gap, so the
+    dashpot visibly compresses and stretches like the spring instead of the
+    rod sliding past a fixed-size cylinder (which could overlap the mass)."""
     x_mass = x_now * SCALE
-    rod_x = [WALL_X + DAMPER_CYL_LEN, x_mass - 0.3]
+    attach_x = x_mass - 0.3
+    gap = attach_x - WALL_X
+    cyl_x1 = WALL_X + DAMPER_CYL_FRAC * gap
+    cyl_h = 0.12
+    cyl_x = [WALL_X, cyl_x1, cyl_x1, WALL_X, WALL_X]
+    cyl_y = [DAMPER_Y - cyl_h, DAMPER_Y - cyl_h, DAMPER_Y + cyl_h, DAMPER_Y + cyl_h, DAMPER_Y - cyl_h]
+    rod_x = [cyl_x1, attach_x]
     rod_y = [DAMPER_Y, DAMPER_Y]
-    return rod_x, rod_y, x_mass
+    return cyl_x, cyl_y, rod_x, rod_y, x_mass
 
 
 def connector_xy(x_now):
@@ -107,7 +115,7 @@ fig = make_subplots(rows=1, cols=2, column_widths=[0.32, 0.68],
                      subplot_titles=("Mass-spring-damper", "Displacement vs. time"))
 
 zx0, zy0, xm0 = spring_xy(x[0])
-rx0, ry0, _ = damper_rod_xy(x[0])
+cylx0, cyly0, rx0, ry0, _ = damper_xy(x[0])
 cx0, cy0 = connector_xy(x[0])
 fig.add_trace(go.Scatter(x=zx0, y=zy0, mode="lines",
                           line=dict(color="#4C78A8", width=3), showlegend=False), row=1, col=1)
@@ -118,6 +126,9 @@ fig.add_trace(go.Scatter(x=t, y=x * 1000, mode="lines", name="x(t)",
                           line=dict(color="#4C78A8")), row=1, col=2)
 fig.add_trace(go.Scatter(x=[t[0]], y=[x[0] * 1000], mode="markers",
                           marker=dict(size=12, color="#E45756"), name="now"), row=1, col=2)
+fig.add_trace(go.Scatter(x=cylx0, y=cyly0, mode="lines", fill="toself",
+                          line=dict(color="#54A24B", width=2), fillcolor="rgba(84,162,75,0.15)",
+                          showlegend=False), row=1, col=1)
 fig.add_trace(go.Scatter(x=rx0, y=ry0, mode="lines",
                           line=dict(color="#54A24B", width=4), showlegend=False), row=1, col=1)
 fig.add_trace(go.Scatter(x=cx0, y=cy0, mode="lines",
@@ -126,9 +137,6 @@ fig.add_trace(go.Scatter(x=cx0, y=cy0, mode="lines",
 # wall (fixed support)
 fig.add_shape(type="line", x0=WALL_X, x1=WALL_X, y0=-0.5, y1=0.5,
               line=dict(color="gray", width=6), row=1, col=1)
-# damper cylinder (fixed housing the piston rod slides through)
-fig.add_shape(type="rect", x0=WALL_X, x1=WALL_X + DAMPER_CYL_LEN, y0=DAMPER_Y - 0.1, y1=DAMPER_Y + 0.1,
-              line=dict(color="#54A24B", width=2), fillcolor="rgba(84,162,75,0.15)", row=1, col=1)
 fig.add_annotation(x=WALL_X + 0.1, y=SPRING_Y + 0.22, text="k", showarrow=False,
                     font=dict(size=13, color="#4C78A8"), row=1, col=1)
 fig.add_annotation(x=WALL_X + 0.1, y=DAMPER_Y - 0.22, text="c", showarrow=False,
@@ -154,15 +162,16 @@ fig.update_yaxes(title_text="x [mm]", row=1, col=2)
 frames = []
 for i in frame_idx:
     zx, zy, xm = spring_xy(x[i])
-    rx, ry, _ = damper_rod_xy(x[i])
+    cylx, cyly, rx, ry, _ = damper_xy(x[i])
     cx, cy = connector_xy(x[i])
     frames.append(go.Frame(
         name=str(i),
-        traces=[0, 1, 3, 4, 5],
+        traces=[0, 1, 3, 4, 5, 6],
         data=[
             go.Scatter(x=zx, y=zy),
             go.Scatter(x=[xm], y=[0]),
             go.Scatter(x=[t[i]], y=[x[i] * 1000]),
+            go.Scatter(x=cylx, y=cyly),
             go.Scatter(x=rx, y=ry),
             go.Scatter(x=cx, y=cy),
         ],
