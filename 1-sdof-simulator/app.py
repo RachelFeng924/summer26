@@ -192,7 +192,7 @@ fig.update_layout(
         ],
     )],
     sliders=[dict(
-        active=0, x=0.15, len=0.85, y=1.16, yanchor="bottom",
+        active=0, x=0.05, len=0.95, y=1.16, yanchor="bottom",
         steps=[dict(method="animate", label="",
                     args=[[str(i)], dict(mode="immediate",
                                           frame=dict(duration=0, redraw=True))])
