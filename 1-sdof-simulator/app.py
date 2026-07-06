@@ -182,7 +182,7 @@ fig.update_layout(
     height=480,
     margin=dict(l=10, r=10, t=130, b=10),
     updatemenus=[dict(
-        type="buttons", direction="left", x=0.0, y=1.28, xanchor="left", yanchor="bottom",
+        type="buttons", direction="left", x=0.388, y=1.28, xanchor="left", yanchor="bottom",
         buttons=[
             dict(label="▶ Play", method="animate",
                  args=[None, dict(frame=dict(duration=frame_duration_ms, redraw=True),
@@ -192,7 +192,7 @@ fig.update_layout(
         ],
     )],
     sliders=[dict(
-        active=0, x=0.0, len=0.288, y=1.16, yanchor="bottom",
+        active=0, x=0.388, len=0.612, y=1.16, yanchor="bottom",
         steps=[dict(method="animate", label="",
                     args=[[str(i)], dict(mode="immediate",
                                           frame=dict(duration=0, redraw=True))])
