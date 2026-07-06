@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip show *)",
+      "Bash(python -m py_compile app.py sdof_model.py)",
+      "Bash(netstat -ano)",
+      "Bash(powershell -Command \"Stop-Process -Id 22044 -Force\")",
+      "Bash(rm -f streamlit.log)"
+    ]
+  }
+}
