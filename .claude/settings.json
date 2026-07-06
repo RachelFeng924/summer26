@@ -5,7 +5,13 @@
       "Bash(python -m py_compile app.py sdof_model.py)",
       "Bash(netstat -ano)",
       "Bash(powershell -Command \"Stop-Process -Id 22044 -Force\")",
-      "Bash(rm -f streamlit.log)"
+      "Bash(rm -f streamlit.log)",
+      "PowerShell(Get-Process | Where-Object { $_.ProcessName -match \"streamlit|python\" } | Select-Object Id, ProcessName, Path)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=42868 or ProcessId=12052 or ProcessId=30236 or ProcessId=30320\")",
+      "PowerShell(Stop-Process -Id 42868,30236 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Id 42868,30236 -ErrorAction SilentlyContinue)",
+      "Bash(mkdir -p sdof-simulator)",
+      "Bash(cp -r \"1. SDOF Simulator/.\" \"sdof-simulator/\")"
     ]
   }
 }
