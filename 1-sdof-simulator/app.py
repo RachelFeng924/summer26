@@ -73,23 +73,42 @@ frame_duration_ms = max(15, (t_end / N_FRAMES) * 1000 / speed)
 
 WALL_X = -1.1
 SCALE = 0.8 / max(x_amp, 1e-6)
+SPRING_Y = 0.35
+DAMPER_Y = -0.35
+DAMPER_CYL_LEN = 0.5
 
 
 def spring_xy(x_now):
-    """Mass position along the +x axis, x_now=0 is equilibrium (dashed reference line)."""
+    """Spring zigzag, offset above the centerline so it sits in parallel with the damper."""
     x_mass = x_now * SCALE
     n_zig = 8
     zig_x = np.linspace(WALL_X, x_mass - 0.3, n_zig)
-    zig_y = 0.15 * (np.arange(n_zig) % 2 * 2 - 1)
-    zig_y[0] = 0
-    zig_y[-1] = 0
+    zig_y = 0.12 * (np.arange(n_zig) % 2 * 2 - 1) + SPRING_Y
+    zig_y[0] = SPRING_Y
+    zig_y[-1] = SPRING_Y
     return zig_x, zig_y, x_mass
+
+
+def damper_rod_xy(x_now):
+    """Piston rod running from the fixed cylinder to the mass, offset below the centerline."""
+    x_mass = x_now * SCALE
+    rod_x = [WALL_X + DAMPER_CYL_LEN, x_mass - 0.3]
+    rod_y = [DAMPER_Y, DAMPER_Y]
+    return rod_x, rod_y, x_mass
+
+
+def connector_xy(x_now):
+    """Vertical link through the mass tying the spring and damper attachment points together."""
+    x_mass = x_now * SCALE
+    return [x_mass - 0.3, x_mass - 0.3], [SPRING_Y, DAMPER_Y]
 
 
 fig = make_subplots(rows=1, cols=2, column_widths=[0.32, 0.68],
                      subplot_titles=("Mass-spring-damper", "Displacement vs. time"))
 
 zx0, zy0, xm0 = spring_xy(x[0])
+rx0, ry0, _ = damper_rod_xy(x[0])
+cx0, cy0 = connector_xy(x[0])
 fig.add_trace(go.Scatter(x=zx0, y=zy0, mode="lines",
                           line=dict(color="#4C78A8", width=3), showlegend=False), row=1, col=1)
 fig.add_trace(go.Scatter(x=[xm0], y=[0], mode="markers+text",
@@ -99,10 +118,21 @@ fig.add_trace(go.Scatter(x=t, y=x * 1000, mode="lines", name="x(t)",
                           line=dict(color="#4C78A8")), row=1, col=2)
 fig.add_trace(go.Scatter(x=[t[0]], y=[x[0] * 1000], mode="markers",
                           marker=dict(size=12, color="#E45756"), name="now"), row=1, col=2)
+fig.add_trace(go.Scatter(x=rx0, y=ry0, mode="lines",
+                          line=dict(color="#54A24B", width=4), showlegend=False), row=1, col=1)
+fig.add_trace(go.Scatter(x=cx0, y=cy0, mode="lines",
+                          line=dict(color="gray", width=2), showlegend=False), row=1, col=1)
 
 # wall (fixed support)
 fig.add_shape(type="line", x0=WALL_X, x1=WALL_X, y0=-0.5, y1=0.5,
               line=dict(color="gray", width=6), row=1, col=1)
+# damper cylinder (fixed housing the piston rod slides through)
+fig.add_shape(type="rect", x0=WALL_X, x1=WALL_X + DAMPER_CYL_LEN, y0=DAMPER_Y - 0.1, y1=DAMPER_Y + 0.1,
+              line=dict(color="#54A24B", width=2), fillcolor="rgba(84,162,75,0.15)", row=1, col=1)
+fig.add_annotation(x=WALL_X + 0.1, y=SPRING_Y + 0.22, text="k", showarrow=False,
+                    font=dict(size=13, color="#4C78A8"), row=1, col=1)
+fig.add_annotation(x=WALL_X + 0.1, y=DAMPER_Y - 0.22, text="c", showarrow=False,
+                    font=dict(size=13, color="#54A24B"), row=1, col=1)
 # equilibrium reference (x = 0)
 fig.add_shape(type="line", x0=0, x1=0, y0=-0.7, y1=0.7,
               line=dict(color="gray", width=1, dash="dot"), row=1, col=1)
@@ -117,20 +147,24 @@ fig.add_annotation(x=1.25, y=-1.0, text="+x", showarrow=False,
 fig.add_hline(y=0, line=dict(color="gray", width=1, dash="dot"), row=1, col=2)
 
 fig.update_xaxes(visible=False, range=[-1.6, 1.6], row=1, col=1)
-fig.update_yaxes(visible=False, range=[-1.2, 1.2], scaleanchor="x", scaleratio=1, row=1, col=1)
+fig.update_yaxes(visible=False, range=[-1.4, 1.4], scaleanchor="x", scaleratio=1, row=1, col=1)
 fig.update_xaxes(title_text="time [s]", row=1, col=2)
 fig.update_yaxes(title_text="x [mm]", row=1, col=2)
 
 frames = []
 for i in frame_idx:
     zx, zy, xm = spring_xy(x[i])
+    rx, ry, _ = damper_rod_xy(x[i])
+    cx, cy = connector_xy(x[i])
     frames.append(go.Frame(
         name=str(i),
-        traces=[0, 1, 3],
+        traces=[0, 1, 3, 4, 5],
         data=[
             go.Scatter(x=zx, y=zy),
             go.Scatter(x=[xm], y=[0]),
             go.Scatter(x=[t[i]], y=[x[i] * 1000]),
+            go.Scatter(x=rx, y=ry),
+            go.Scatter(x=cx, y=cy),
         ],
     ))
 fig.frames = frames

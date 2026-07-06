@@ -11,7 +11,12 @@
       "PowerShell(Stop-Process -Id 42868,30236 -Force -ErrorAction SilentlyContinue)",
       "PowerShell(Get-Process -Id 42868,30236 -ErrorAction SilentlyContinue)",
       "Bash(mkdir -p sdof-simulator)",
-      "Bash(cp -r \"1. SDOF Simulator/.\" \"sdof-simulator/\")"
+      "Bash(cp -r \"1. SDOF Simulator/.\" \"sdof-simulator/\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('app.py', doraise=True\\); print\\('ok'\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(timeout 15 python -m streamlit run app.py --server.headless true --server.port 8534)",
+      "Bash(taskkill //F //IM streamlit.exe)",
+      "Bash(pkill -f \"streamlit run app.py\")"
     ]
   }
 }
