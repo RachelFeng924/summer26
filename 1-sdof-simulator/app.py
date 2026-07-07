@@ -184,11 +184,10 @@ fig.update_layout(
     updatemenus=[dict(
         type="buttons", direction="left", x=0.388, y=1.28, xanchor="left", yanchor="bottom",
         buttons=[
-            dict(label="▶ Play", method="animate",
+            dict(label="▶ Play / ⏸ Pause", method="animate",
                  args=[None, dict(frame=dict(duration=frame_duration_ms, redraw=True),
-                                   fromcurrent=True, transition=dict(duration=0))]),
-            dict(label="⏸ Pause", method="animate",
-                 args=[[None], dict(frame=dict(duration=0, redraw=False), mode="immediate")]),
+                                   fromcurrent=True, transition=dict(duration=0))],
+                 args2=[[None], dict(frame=dict(duration=0, redraw=False), mode="immediate")]),
         ],
     )],
     sliders=[dict(
