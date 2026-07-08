@@ -16,7 +16,9 @@
       "Bash(python -c ' *)",
       "Bash(timeout 15 python -m streamlit run app.py --server.headless true --server.port 8534)",
       "Bash(taskkill //F //IM streamlit.exe)",
-      "Bash(pkill -f \"streamlit run app.py\")"
+      "Bash(pkill -f \"streamlit run app.py\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('sdof_model.py', encoding='utf-8'\\).read\\(\\)\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app.py', encoding='utf-8'\\).read\\(\\)\\)\")"
     ]
   }
 }

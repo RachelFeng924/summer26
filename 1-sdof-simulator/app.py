@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 
-from sdof_model import derived_quantities, simulate, frf_sweep
+from sdof_model import derived_quantities, simulate, frf_sweep, analytical_solution, log_decrement
 
 st.set_page_config(page_title="SDOF Simulator", layout="wide")
 
@@ -73,10 +73,12 @@ st.session_state.F0, st.session_state.drive_ratio = F0, drive_ratio
 st.session_state.speed = speed
 
 st.title("Spring-Mass-Damper Simulator")
+
+st.subheader("System components")
 st.markdown(
-    "A **spring** (k) stores energy and pulls the mass back toward rest \na **damper/dashpot** "
-    "(c) resists motion and bleeds that energy away as heat. \nTheir balance sets how the mass "
-    "settles after a disturbance:"
+    "- A **spring** (k) stores energy and pulls the mass back toward rest.\n"
+    "- A **damper/dashpot** (c) resists motion and bleeds that energy away as heat.\n"
+    "- Their balance sets how the mass settles after a disturbance:"
 )
 regime_cols = st.columns(4)
 regime_cols[0].markdown("**Undamped**\n\nc = 0 — oscillates forever")
@@ -84,6 +86,28 @@ regime_cols[1].markdown("**Underdamped**\n\n0 < c < c_crit — oscillates, decay
 regime_cols[2].markdown("**Critical**\n\nc = c_crit — fastest return, no overshoot")
 regime_cols[3].markdown("**Overdamped**\n\nc > c_crit — slow return, no oscillation")
 
+st.subheader("Simulation parameters + animation")
+st.caption(
+    "Solves m·x″ + c·x′ + k·x = F(t) numerically (solid line) and compares it against the "
+    "exact closed-form solution (dotted line)."
+)
+with st.expander("How each solver works"):
+    st.markdown(
+        "**Numerical (state-space + `solve_ivp`)** — the 2nd-order ODE is rewritten as two "
+        "coupled 1st-order ODEs using the state vector `[x, v]`: `x′ = v`, `v′ = (F(t) − c·v − "
+        "k·x) / m`. SciPy's `solve_ivp` integrates that state vector forward in time with an "
+        "adaptive Runge-Kutta method (RK45), taking smaller steps where the solution curves "
+        "fastest and larger ones where it's flat, to hit tight error tolerances "
+        "(`rtol=1e-9, atol=1e-12`). This works for *any* regime or forcing, but has no formula "
+        "— just a dense sequence of stepped-through numbers.\n\n"
+        "**Analytical (closed form)** — for free vibration (F0 = 0), each damping regime has "
+        "its own exact formula from solving the ODE's characteristic equation directly (e.g. "
+        "the underdamped case is a decaying cosine, `x0·e^(−ζωn·t)·cos(ωd·t) + …`). When a "
+        "harmonic force is applied, the exact solution is the steady-state term (from the "
+        "receptance, see below) plus a free-vibration transient — sized so the sum matches the "
+        "true initial conditions. Because the ODE is linear, that superposition is exact, not "
+        "an approximation."
+    )
 wn, zeta, wd, regime = derived_quantities(m, k, c)
 info_cols = st.columns(2)
 info_cols[0].metric("ωn [rad/s]", f"{wn:.2f}", help=f"fn = {wn/(2*np.pi):.2f} Hz")
@@ -95,6 +119,9 @@ t_end = 8 * (2 * np.pi / wn)
 n_points = 600
 t, x, v = simulate_cached(m, k, c, x0, v0, F0, Omega, t_end, n_points=n_points)
 x_amp = np.max(np.abs(x)) if np.max(np.abs(x)) > 0 else 1.0
+
+x_ana = analytical_solution(t, m, k, c, x0, v0, F0, Omega)
+ana_valid = not np.any(np.isnan(x_ana))
 
 # ---------------------------------------------------- animated dashboard --
 N_FRAMES = 120
@@ -152,8 +179,12 @@ fig.add_trace(go.Scatter(x=zx0, y=zy0, mode="lines",
 fig.add_trace(go.Scatter(x=[xm0], y=[0], mode="markers+text",
                           marker=dict(size=46, color="#F2B5B4", line=dict(color="#E45756", width=2), symbol="square"),
                           text=["m"], textfont=dict(size=16), showlegend=False), row=1, col=1)
-fig.add_trace(go.Scatter(x=t, y=x * 1000, mode="lines", name="x(t)",
+fig.add_trace(go.Scatter(x=t, y=x * 1000, mode="lines", name="numerical",
                           line=dict(color="#4C78A8")), row=1, col=2)
+if ana_valid:
+    fig.add_trace(go.Scatter(x=t, y=x_ana * 1000, mode="lines", name="analytical",
+                              line=dict(color="#F58518", width=2, dash="dot")), row=1, col=2)
+now_marker_idx = len(fig.data)
 fig.add_trace(go.Scatter(x=[t[0]], y=[x[0] * 1000], mode="markers",
                           marker=dict(size=12, color="#E45756"), name="now"), row=1, col=2)
 fig.add_trace(go.Scatter(x=cylx0, y=cyly0, mode="lines", fill="toself",
@@ -196,7 +227,7 @@ for i in frame_idx:
     cx, cy = connector_xy(x[i])
     frames.append(go.Frame(
         name=str(i),
-        traces=[0, 1, 3, 4, 5, 6],
+        traces=[0, 1, now_marker_idx, now_marker_idx + 1, now_marker_idx + 2, now_marker_idx + 3],
         data=[
             go.Scatter(x=zx, y=zy),
             go.Scatter(x=[xm], y=[0]),
@@ -231,12 +262,78 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
+if ana_valid:
+    max_err = np.max(np.abs(x - x_ana)) * 1000
+    st.caption(
+        f"Numerical vs. analytical agree closely: max deviation **{max_err:.2e} mm** "
+        f"(numerical tolerance is set to ~1e-9). The dotted analytical curve is the exact "
+        f"closed-form solution — free-vibration formula for the active damping regime, plus "
+        f"the steady-state term when a force is applied."
+    )
+else:
+    st.caption(
+        "Analytical solution is undefined here — this is exact undamped resonance "
+        "(Ω = ωn with ζ = 0), where the closed-form steady-state amplitude is unbounded."
+    )
+
+# ---------------------------------------------------------- log decrement --
+st.subheader("Logarithmic decrement verification")
+st.caption(
+    "An independent check: measure ωn and ζ purely from the peaks of the simulated decay "
+    "curve, using the log-decrement method, and compare against the input values."
+)
+with st.expander("How log-decrement recovery works"):
+    st.markdown(
+        "This method never looks at m, k, or c — it only reads peaks off the decay curve, "
+        "so agreement with the input values is a strong independent check that the physics "
+        "(and the solver) are correct:\n\n"
+        "1. **Find the peaks** of the simulated `x(t)` (SciPy's `find_peaks`).\n"
+        "2. **Peak spacing → ωd → ωn.** The average time between consecutive peaks is the "
+        "damped period `Td`, so `ωd = 2π / Td`.\n"
+        "3. **Peak decay ratio → ζ.** How much each peak shrinks relative to the one *n* "
+        "cycles later gives the logarithmic decrement `δ = (1/n)·ln(x₁/xₙ)`, which inverts "
+        "exactly to `ζ = δ / √(4π² + δ²)`.\n"
+        "4. Combine steps 2–3: `ωn = ωd / √(1 − ζ²)`."
+    )
+ld = log_decrement(t, x) if (F0 == 0 and 0 < zeta < 1) else None
+if ld is not None:
+    ld_cols = st.columns(2)
+    ld_cols[0].markdown(
+        f"**ωn:** input {wn:.3f} rad/s vs. recovered **{ld['wn']:.3f} rad/s** "
+        f"({ld['n_cycles']} cycles measured)"
+    )
+    ld_cols[1].markdown(f"**ζ:** input {zeta:.4f} vs. recovered **{ld['zeta']:.4f}**")
+else:
+    st.caption(
+        "Not applicable right now — this method needs a free (unforced), underdamped decay "
+        "with at least 3 clean peaks to measure. Set force amplitude F0 to 0 and pick an "
+        "underdamped damping level to see it."
+    )
+
 # ------------------------------------------------------------------ FRF ---
 st.subheader("Frequency response function")
 st.caption(
     "How strongly the system responds to a continuous push at each drive frequency. The peak "
     "near Ω/ωn = 1 is **resonance** — more damping (higher ζ) flattens and widens it."
 )
+st.caption(
+    "Computed directly from the closed-form receptance H(ω) = 1 / (k − mω² + icω) swept across "
+    "ω — an algebraic formula, not a simulated trajectory."
+)
+with st.expander("How the FRF is computed"):
+    st.markdown(
+        "For a steady harmonic force `F(t) = F0·cos(ωt)`, the long-run response is also a "
+        "cosine at the same frequency, just scaled and phase-shifted: `x(t) = F0·|H(ω)|·"
+        "cos(ωt + φ)`. Writing `F(t)` and `x(t)` as the real part of complex exponentials turns "
+        "the ODE into plain algebra — plugging `x = X·e^(iωt)` into `m·x″ + c·x′ + k·x = F(t)` "
+        "and solving for `X/F0` gives the receptance directly, no differential equation solving "
+        "needed:\n\n"
+        "`H(ω) = X / F0 = 1 / (k − mω² + icω)`\n\n"
+        "- **`|H(ω)|`** (top plot) is how much the displacement is amplified relative to the "
+        "force — the sharp peak near ω = ωn is resonance.\n"
+        "- **`angle(H(ω))`** (bottom plot) is the phase lag φ between the force and the "
+        "resulting motion, which swings from ~0° to ~−180° as ω crosses resonance."
+    )
 zetas_to_compare = sorted(set([0.05, 0.10, 0.25, 0.50, 1.00, round(zeta, 3)]))
 w, wn_, curves = frf_sweep_cached(k, m, zetas_to_compare)
 
