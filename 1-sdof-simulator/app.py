@@ -74,8 +74,8 @@ st.session_state.speed = speed
 
 st.title("Spring-Mass-Damper Simulator")
 st.markdown(
-    "A **spring** (k) stores energy and pulls the mass back toward rest; a **damper/dashpot** "
-    "(c) resists motion and bleeds that energy away as heat. Their balance sets how the mass "
+    "A **spring** (k) stores energy and pulls the mass back toward rest \na **damper/dashpot** "
+    "(c) resists motion and bleeds that energy away as heat. \nTheir balance sets how the mass "
     "settles after a disturbance:"
 )
 regime_cols = st.columns(4)
