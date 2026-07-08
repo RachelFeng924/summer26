@@ -20,30 +20,48 @@ for key, val in defaults.items():
 # --------------------------------------------------------------- sidebar ---
 st.sidebar.title("System parameters")
 
-m = st.sidebar.slider("mass  m  [kg]", 0.1, 10.0, st.session_state.m, 0.1)
-k = st.sidebar.slider("stiffness  k  [N/m]", 10.0, 2000.0, st.session_state.k, 10.0)
+m = st.sidebar.slider("mass  m  [kg]", 0.1, 10.0, st.session_state.m, 0.1,
+                       help="The moving weight on the spring. Heavier mass → slower oscillation.")
+k = st.sidebar.slider("stiffness  k  [N/m]", 10.0, 2000.0, st.session_state.k, 10.0,
+                       help="Spring stiffness: how much force it takes to stretch/compress the spring "
+                            "by 1 m. Stiffer spring → faster oscillation.")
 c_crit = 2 * np.sqrt(k * m)
-c = st.sidebar.slider("damping  c  [N·s/m]", 0.0, float(2 * c_crit), st.session_state.c, 0.5)
+c = st.sidebar.slider("damping  c  [N·s/m]", 0.0, float(2 * c_crit), st.session_state.c, 0.5,
+                       help="The dashpot's resistance to motion, proportional to velocity. It bleeds "
+                            "energy out of the system, shrinking the oscillation over time.")
 
 st.sidebar.markdown("**Presets**")
-if st.sidebar.button("Undamped", use_container_width=True):
+if st.sidebar.button("Undamped", use_container_width=True,
+                      help="c = 0: no energy loss, oscillates forever at the same amplitude."):
     c = 0.0
-if st.sidebar.button("Underdamped", use_container_width=True):
+if st.sidebar.button("Underdamped", use_container_width=True,
+                      help="0 < c < c_crit: oscillates while decaying — the everyday case (car "
+                           "suspension, guitar string)."):
     c = 0.1 * c_crit
-if st.sidebar.button("Critical", use_container_width=True):
+if st.sidebar.button("Critical", use_container_width=True,
+                      help="c = c_crit: returns to rest fastest without overshooting/oscillating."):
     c = c_crit
-if st.sidebar.button("Overdamped", use_container_width=True):
+if st.sidebar.button("Overdamped", use_container_width=True,
+                      help="c > c_crit: too much damping — creeps back to rest slower than critical, "
+                           "with no oscillation."):
     c = 1.5 * c_crit
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Initial conditions**")
-x0 = st.sidebar.slider("initial displacement  x0  [m]", -0.05, 0.05, st.session_state.x0, 0.001)
-v0 = st.sidebar.slider("initial velocity  v0  [m/s]", -1.0, 1.0, st.session_state.v0, 0.05)
+x0 = st.sidebar.slider("initial displacement  x0  [m]", -0.05, 0.05, st.session_state.x0, 0.001,
+                        help="Where the mass starts, relative to its resting position.")
+v0 = st.sidebar.slider("initial velocity  v0  [m/s]", -1.0, 1.0, st.session_state.v0, 0.05,
+                        help="How fast the mass is moving at the start.")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Harmonic forcing**")
-F0 = st.sidebar.slider("force amplitude  F0  [N]", 0.0, 20.0, st.session_state.F0, 0.5)
-drive_ratio = st.sidebar.slider("drive ratio  Ω / ωn", 0.1, 3.0, st.session_state.drive_ratio, 0.05)
+F0 = st.sidebar.slider("force amplitude  F0  [N]", 0.0, 20.0, st.session_state.F0, 0.5,
+                        help="An external push-pull force applied continuously, oscillating at the "
+                             "drive ratio below. Set to 0 for free vibration only.")
+drive_ratio = st.sidebar.slider("drive ratio  Ω / ωn", 0.1, 3.0, st.session_state.drive_ratio, 0.05,
+                                 help="Forcing frequency relative to the system's natural frequency. "
+                                      "Near 1.0 the system resonates, swinging much wider than F0 alone "
+                                      "would suggest.")
 
 st.sidebar.markdown("---")
 speed = st.sidebar.slider("playback speed", 0.25, 4.0, st.session_state.speed, 0.25)
@@ -53,6 +71,18 @@ st.session_state.m, st.session_state.k, st.session_state.c = m, k, c
 st.session_state.x0, st.session_state.v0 = x0, v0
 st.session_state.F0, st.session_state.drive_ratio = F0, drive_ratio
 st.session_state.speed = speed
+
+st.title("Spring-Mass-Damper Simulator")
+st.markdown(
+    "A **spring** (k) stores energy and pulls the mass back toward rest; a **damper/dashpot** "
+    "(c) resists motion and bleeds that energy away as heat. Their balance sets how the mass "
+    "settles after a disturbance:"
+)
+regime_cols = st.columns(4)
+regime_cols[0].markdown("**Undamped**\n\nc = 0 — oscillates forever")
+regime_cols[1].markdown("**Underdamped**\n\n0 < c < c_crit — oscillates, decaying")
+regime_cols[2].markdown("**Critical**\n\nc = c_crit — fastest return, no overshoot")
+regime_cols[3].markdown("**Overdamped**\n\nc > c_crit — slow return, no oscillation")
 
 wn, zeta, wd, regime = derived_quantities(m, k, c)
 info_cols = st.columns(2)
@@ -203,6 +233,10 @@ st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------------------------ FRF ---
 st.subheader("Frequency response function")
+st.caption(
+    "How strongly the system responds to a continuous push at each drive frequency. The peak "
+    "near Ω/ωn = 1 is **resonance** — more damping (higher ζ) flattens and widens it."
+)
 zetas_to_compare = sorted(set([0.05, 0.10, 0.25, 0.50, 1.00, round(zeta, 3)]))
 w, wn_, curves = frf_sweep_cached(k, m, zetas_to_compare)
 
