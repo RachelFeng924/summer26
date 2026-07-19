@@ -205,13 +205,12 @@ def superposition_animation_figure(t, x, contributions, n_frames=150, spacing=1.
 
 def _play_pause_menu():
     return dict(
-        type="buttons", showactive=False, x=0, y=-0.15, xanchor="left", yanchor="top",
+        type="buttons", showactive=True, x=0, y=-0.15, xanchor="left", yanchor="top",
         buttons=[
-            dict(label="Play", method="animate",
+            dict(label="▶ / ❚❚", method="animate",
                  args=[None, dict(frame=dict(duration=40, redraw=True), fromcurrent=True,
-                                   transition=dict(duration=0))]),
-            dict(label="Pause", method="animate",
-                 args=[[None], dict(frame=dict(duration=0, redraw=False), mode="immediate")]),
+                                   transition=dict(duration=0))],
+                 args2=[[None], dict(frame=dict(duration=0, redraw=False), mode="immediate")]),
         ],
     )
 
@@ -229,14 +228,36 @@ def _frame_slider(n_frames):
 # Sidebar: build M and K
 # ---------------------------------------------------------------------------
 
+st.markdown(
+    """
+    <style>
+    .block-container { padding-top: 3.5rem; padding-bottom: 6rem; max-width: 1180px; }
+    h2 { margin-top: 3.5rem; padding-top: 0.75rem; border-top: 1px solid rgba(128,128,128,0.25); }
+    h3 { margin-top: 2rem; }
+    div[data-testid="stExpander"] { margin-top: 0.75rem; margin-bottom: 0.75rem; }
+    div[data-testid="stVerticalBlockBorderWrapper"] { margin-bottom: 0.75rem; }
+    hr { margin-top: 2.5rem; margin-bottom: 2.5rem; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("MDOF Vibration Simulator")
 st.caption("Solve the generalized eigenproblem for any mass/stiffness matrix pair, "
            "verify it, and animate the mode shapes — individually and superimposed.")
+st.write("")
 
 st.sidebar.header("System definition")
 input_mode = st.sidebar.radio("Input mode", ["Spring-mass chain", "Custom M / K matrices"])
 
 if input_mode == "Spring-mass chain":
+    with st.sidebar.expander("How M, K are assembled"):
+        st.markdown(
+            "A chain of `n` masses in series, fixed at both ends "
+            "(`wall–k0–m0–k1–m1–...–kn-1–m(n-1)–kn–wall`). `K` is tridiagonal — each "
+            "diagonal entry is the sum of the two springs touching that mass, "
+            "off-diagonals are `-k` for the shared spring. `M` is diagonal."
+        )
     n_dof = st.sidebar.slider("Number of masses", 2, 8, 4)
 
     default_masses = [1.0, 1.5, 1.0, 2.0, 1.0, 1.5, 1.0, 2.0][:n_dof]
@@ -305,7 +326,8 @@ except LinAlgError:
 
 n = M.shape[0]
 
-col_m, col_k = st.columns(2)
+st.header("System matrices")
+col_m, col_k = st.columns(2, gap="large")
 with col_m:
     st.subheader("M (mass matrix)")
     st.dataframe(pd.DataFrame(M).style.format("{:.3f}"), use_container_width=True)
@@ -313,7 +335,25 @@ with col_k:
     st.subheader("K (stiffness matrix)")
     st.dataframe(pd.DataFrame(K).style.format("{:.2f}"), use_container_width=True)
 
-st.subheader("Natural frequencies")
+st.divider()
+
+st.header("Natural frequencies & mode shapes")
+
+with st.expander("How the eigenproblem is solved"):
+    st.markdown("Undamped free vibration `M x'' + K x = 0` with a harmonic trial solution "
+                "`x = phi * e^{i w t}` reduces to the generalized eigenproblem:")
+    st.latex(r"K \boldsymbol{\phi} = \omega^2 M \boldsymbol{\phi}")
+    st.markdown(
+        "`scipy.linalg.eigh(K, M)` solves this directly since it's built for symmetric/"
+        "Hermitian generalized problems — no manual `M⁻¹K` product or eigenvalue sorting "
+        "needed; it returns eigenvalues already ascending. Each eigenvector is then "
+        "**mass-normalized**, scaling `phi_i` so:"
+    )
+    st.latex(r"\boldsymbol{\phi}_i^T M \boldsymbol{\phi}_i = 1 \quad\Rightarrow\quad "
+             r"\omega_i = \sqrt{\lambda_i}, \qquad f_i = \frac{\omega_i}{2\pi}")
+    st.markdown("This convention is what makes the mode matrix `Phi` diagonalize `M` to the "
+                "identity and `K` to `diag(omega_i^2)` — see the orthogonality check below.")
+
 freq_df = pd.DataFrame({
     "mode": [f"mode {i+1}" for i in range(n)],
     "wn [rad/s]": wn,
@@ -321,27 +361,41 @@ freq_df = pd.DataFrame({
 })
 st.dataframe(freq_df.style.format({"wn [rad/s]": "{:.4f}", "fn [Hz]": "{:.4f}"}),
              hide_index=True, use_container_width=True)
+st.write("")
 
 with st.expander("Mode shapes (mass-normalized Phi)"):
     st.dataframe(pd.DataFrame(Phi, columns=[f"mode {i+1}" for i in range(n)])
                  .style.format("{:.4f}"), use_container_width=True)
 
 with st.expander("Orthogonality check — Phi should diagonalize M and K"):
+    st.markdown("Mass-normalized modes are orthogonal with respect to both `M` and `K`:")
+    st.latex(r"\Phi^T M \Phi = I, \qquad \Phi^T K \Phi = \mathrm{diag}(\omega_i^2)")
+    st.markdown("If the off-diagonal terms below aren't ~0, something's wrong with the "
+                "eigensolve or normalization.")
     Mr = Phi.T @ M @ Phi
     Kr = Phi.T @ K @ Phi
     off_diag_M = Mr - np.diag(np.diag(Mr))
     off_diag_K = Kr - np.diag(np.diag(Kr))
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, gap="large")
     with c1:
         st.caption("Phi^T M Phi (should be I)")
         st.dataframe(pd.DataFrame(Mr).style.format("{:.2e}"), use_container_width=True)
     with c2:
         st.caption("Phi^T K Phi (should be diag(wn^2))")
         st.dataframe(pd.DataFrame(Kr).style.format("{:.2e}"), use_container_width=True)
+    st.write("")
     st.write(f"max |off-diagonal| in Phi^T M Phi: `{np.max(np.abs(off_diag_M)):.2e}`")
     st.write(f"max |off-diagonal| in Phi^T K Phi: `{np.max(np.abs(off_diag_K)):.2e}`")
 
 with st.expander("FRF check — direct matrix inversion vs. modal-sum reconstruction"):
+    st.markdown("The direct FRF inverts the dynamic stiffness matrix at each frequency:")
+    st.latex(r"H(\omega) = \left[K - \omega^2 M\right]^{-1}")
+    st.markdown("The modal sum reconstructs the same thing with no per-frequency matrix "
+                "inversion — only a sum over modes, each contributing a rank-1 term that "
+                "blows up at its own resonance (undamped case):")
+    st.latex(r"H(\omega) = \sum_i \frac{\boldsymbol{\phi}_i \boldsymbol{\phi}_i^T}"
+             r"{\omega_i^2 - \omega^2}")
+    st.write("")
     drive = st.number_input("Drive DOF", 0, n - 1, 0)
     w_sweep = np.linspace(0.1, 1.3 * wn[-1], 1200)
     for wr in wn:
@@ -350,6 +404,7 @@ with st.expander("FRF check — direct matrix inversion vs. modal-sum reconstruc
     H_modal = frf_modal(w_sweep, wn, Phi)
     diff = np.max(np.abs(H_direct - H_modal))
     st.write(f"max |H_direct - H_modal| over the sweep: `{diff:.2e}`")
+    st.write("")
 
     fig = go.Figure()
     plotly_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
@@ -365,21 +420,35 @@ with st.expander("FRF check — direct matrix inversion vs. modal-sum reconstruc
         fig.add_vline(x=wr, line=dict(color="gray", dash="dot", width=1))
     fig.update_layout(title=f"FRF magnitude, driven at DOF {drive}",
                        xaxis_title="frequency [rad/s]", yaxis_title="|H| [m/N]",
-                       yaxis_type="log", height=450)
+                       yaxis_type="log", height=450, margin=dict(t=60, b=50))
     st.plotly_chart(fig, use_container_width=True)
+
+st.divider()
 
 # ---------------------------------------------------------------------------
 # Mode animations (separate)
 # ---------------------------------------------------------------------------
 
 st.header("Mode shapes — animated individually")
+st.caption("Each mode is a pattern of relative motion at a single frequency.")
+
+with st.expander("How each mode oscillates"):
+    st.markdown("Each mode oscillates independently at its own natural frequency, with every "
+                "DOF moving in a fixed ratio set by the mode shape:")
+    st.latex(r"x_i(t) = \boldsymbol{\phi}_i \cos(\omega_i t)")
+
+st.write("")
 amp_scale = st.slider("Mode animation amplitude scale", 0.05, 1.0, 0.3, 0.05)
+st.write("")
 
 tabs = st.tabs([f"Mode {i+1}" for i in range(n)])
 for i, tab in enumerate(tabs):
     with tab:
+        st.write("")
         fig = mode_animation_figure(i, wn, Phi, amplitude_scale=amp_scale)
         st.plotly_chart(fig, use_container_width=True, key=f"mode_anim_{i}")
+
+st.divider()
 
 # ---------------------------------------------------------------------------
 # Superposition (combined)
@@ -389,7 +458,19 @@ st.header("Superimposed free response")
 st.caption("Pick an initial condition; the system's free response is the sum of every mode's "
            "independently-oscillating contribution.")
 
-ic_col1, ic_col2 = st.columns(2)
+with st.expander("Modal superposition"):
+    st.markdown("Because `Phi` diagonalizes both `M` and `K`, the coordinate change "
+                "`x = Phi @ q` decouples the equations of motion into `n` independent "
+                "single-DOF oscillators, one per mode:")
+    st.latex(r"q_i(t) = q_i(0)\cos(\omega_i t) + \frac{\dot q_i(0)}{\omega_i}\sin(\omega_i t)")
+    st.markdown("Any initial condition maps to modal coordinates via "
+                "`Phi^T M x(0)` and `Phi^T M xdot(0)` (this is exactly `Phi^T M Phi = I` at "
+                "work). The physical response is the superposition of each mode's shape, "
+                "scaled by its own independently-oscillating modal coordinate:")
+    st.latex(r"\mathbf{x}(t) = \Phi \mathbf{q}(t) = \sum_i \boldsymbol{\phi}_i \, q_i(t)")
+
+st.write("")
+ic_col1, ic_col2 = st.columns(2, gap="large")
 with ic_col1:
     st.caption("Initial displacement x0 [m]")
     default_x0 = np.zeros(n)
@@ -404,8 +485,13 @@ with ic_col2:
 x0 = x0_df["x0"].to_numpy(dtype=float)
 v0 = v0_df["v0"].to_numpy(dtype=float)
 
-duration = st.slider("Duration [s]", 1.0, 20.0, 5.0, 0.5)
-super_amp = st.slider("Superposition amplitude scale", 0.1, 3.0, 1.0, 0.1)
+st.write("")
+dur_col, amp_col = st.columns(2, gap="large")
+with dur_col:
+    duration = st.slider("Duration [s]", 1.0, 20.0, 5.0, 0.5)
+with amp_col:
+    super_amp = st.slider("Superposition amplitude scale", 0.1, 3.0, 1.0, 0.1)
+st.write("")
 
 t_check = np.linspace(0, duration, 800)
 x_super, contributions = free_response(t_check, wn, Phi, M, x0, v0)
@@ -422,5 +508,6 @@ with st.expander("Time-series view of the superposed response"):
         fig_ts.add_trace(go.Scatter(x=t_check, y=x_super[i], mode="lines",
                                      name=f"DOF {i}", line=dict(color=plotly_colors[i % 10])))
     fig_ts.update_layout(title="Free response from the chosen initial condition",
-                         xaxis_title="time [s]", yaxis_title="displacement [m]", height=400)
+                         xaxis_title="time [s]", yaxis_title="displacement [m]", height=400,
+                         margin=dict(t=60, b=50))
     st.plotly_chart(fig_ts, use_container_width=True)
