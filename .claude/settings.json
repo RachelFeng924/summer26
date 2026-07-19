@@ -18,7 +18,31 @@
       "Bash(taskkill //F //IM streamlit.exe)",
       "Bash(pkill -f \"streamlit run app.py\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\('app.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('sdof_model.py', encoding='utf-8'\\).read\\(\\)\\)\")",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('app.py', encoding='utf-8'\\).read\\(\\)\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app.py', encoding='utf-8'\\).read\\(\\)\\)\")",
+      "Bash(python -c \"import scipy; print\\(scipy.__version__\\)\")",
+      "Bash(python -c \"import matplotlib; print\\(matplotlib.__version__\\)\")",
+      "Bash(python -c \"import nbformat\")",
+      "Bash(../.venv/Scripts/python.exe -m pip install -q nbformat pillow)",
+      "Bash(../.venv/Scripts/python.exe build_notebook.py)",
+      "Bash(../.venv/Scripts/python.exe -m pip install -q jupyter nbconvert)",
+      "Bash(../.venv/Scripts/python.exe -m jupyter nbconvert --to notebook --execute --inplace mdof.ipynb)",
+      "Bash(../.venv/Scripts/python.exe -c \"import numpy\")",
+      "Bash(python -c \"import numpy, scipy, matplotlib; print\\('global ok'\\)\")",
+      "Bash(python -m pip install -q nbformat nbconvert pillow ipykernel)",
+      "Bash(python build_notebook.py)",
+      "Bash(python -m jupyter nbconvert --to notebook --execute --inplace mdof.ipynb)",
+      "Bash(jupyter nbconvert *)",
+      "Bash(python \"C:\\\\Users\\\\rache\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-rache-Documents-summer26\\\\0c69d3bf-9b67-4e62-9dfb-a12e82d7f7e0\\\\scratchpad\\\\add_cells.py\")",
+      "Bash(python -c \"import streamlit, plotly, numpy, scipy, pandas; print\\('ok', streamlit.__version__, plotly.__version__\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8765)",
+      "Bash(grep -v \"use_container_width\\\\|will be removed\\\\|For \\\\`use_container\\\\|WARNING streamlit\")",
+      "Bash(powershell -NoProfile -Command 'Get-CimInstance Win32_Process -Filter \"CommandLine LIKE '\\\\''%8765%'\\\\''\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }')",
+      "Bash(rm -f streamlit_log.txt)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"CommandLine LIKE '%8765%'\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }; Remove-Item -Force \"c:\\\\Users\\\\rache\\\\Documents\\\\summer26\\\\2-mdof-simulator\\\\streamlit_log.txt\" -ErrorAction SilentlyContinue; \"done\")",
+      "PowerShell(Get-Process -Name streamlit -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"CommandLine LIKE '%8765%'\" -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"Name = 'python.exe'\" -ErrorAction SilentlyContinue)"
     ]
   }
 }
